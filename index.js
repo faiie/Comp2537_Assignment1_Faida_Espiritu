@@ -16,22 +16,21 @@ const expireTime = 1 * 60 * 60 * 1000;
 const mongodb_host = process.env.MONGODB_HOST;
 const mongodb_user = process.env.MONGODB_USER;
 const mongodb_password = process.env.MONGODB_PASSWORD;
-const mongodb_database = process.env.MONGODB_DATABASE;
-const mongodb_session_secret = process.env.MONGODB_SESSION_SECRET;
+const mongodb_user_database = process.env.MONGODB_USER_DATABASE;
+const mongodb_session_database = process.env.MONGODB_SESSION_DATABASE;const mongodb_session_secret = process.env.MONGODB_SESSION_SECRET;
 const node_session_secret = process.env.NODE_SESSION_SECRET;
 
 // Connect to MongoDB
 const { MongoClient } = require("mongodb");
 const atlasURI = `mongodb+srv://${mongodb_user}:${mongodb_password}@${mongodb_host}/?retryWrites=true`;
 var database = new MongoClient(atlasURI);
-const userCollection = database.db(mongodb_database).collection("users");
-
+const userCollection = database.db(mongodb_user_database).collection("users");
 // Tell express to parse form data
 app.use(express.urlencoded({ extended: false }));
 
 // Set up sessions stored in MongoDB
 var mongoStore = new MongoStore({
-  mongoUrl: `mongodb+srv://${mongodb_user}:${mongodb_password}@${mongodb_host}/sessions`,
+  mongoUrl: `mongodb+srv://${mongodb_user}:${mongodb_password}@${mongodb_host}/${mongodb_session_database}`,
   crypto: { secret: mongodb_session_secret },
 });
 
@@ -97,9 +96,15 @@ app.post("/signupSubmit", async (req, res) => {
 
   const validationResult = schema.validate({ name, email, password });
   if (validationResult.error != null) {
-    const message = validationResult.error.details[0].message;
+    const errors = validationResult.error.details;
+    let messages = [];
+    for (let error of errors) {
+      if (error.message.includes("name")) messages.push("Name is required.");
+      else if (error.message.includes("email")) messages.push("Email is required.");
+      else if (error.message.includes("password")) messages.push("Password is required.");
+    }
     res.send(`
-      <p>${message}</p>
+      ${messages.map(m => `<p>${m}</p>`).join("")}
       <a href="/signup">Try again</a>
     `);
     return;
